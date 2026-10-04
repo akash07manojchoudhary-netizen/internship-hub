@@ -1,0 +1,60 @@
+const express = require('express');
+const Internship = require('../models/Internship');
+const Company = require('../models/Company');
+const { protect } = require('../middleware/auth');
+
+const router = express.Router();
+
+router.get('/', async (req, res) => {
+  try {
+    const internships = await Internship.find().populate('companyId', 'companyName industry website');
+    res.json({ internships });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to fetch internships' });
+  }
+});
+
+router.get('/company/:companyId', async (req, res) => {
+  try {
+    const internships = await Internship.find({ companyId: req.params.companyId });
+    res.json({ internships });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to fetch company internships' });
+  }
+});
+
+router.post('/', protect, async (req, res) => {
+  try {
+    if (req.user.type !== 'company') {
+      return res.status(403).json({ message: 'Only companies can post internships' });
+    }
+
+    const { title, description, skillsRequired, stipend, location, type, applyLink } = req.body;
+
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Title and description are required' });
+    }
+
+    const company = await Company.findById(req.user.id);
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const internship = await Internship.create({
+      companyId: company._id,
+      title,
+      description,
+      skillsRequired: Array.isArray(skillsRequired) ? skillsRequired : [],
+      stipend: stipend || 0,
+      location: location || 'Remote',
+      type: type || 'Internship',
+      applyLink: applyLink || '',
+    });
+
+    res.status(201).json({ internship });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to create internship' });
+  }
+});
+
+module.exports = router;

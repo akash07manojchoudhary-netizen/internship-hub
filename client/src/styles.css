@@ -1,0 +1,299 @@
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+
+const defaultStudentForm = {
+  name: '',
+  email: '',
+  password: '',
+  college: '',
+  skills: 'React, JavaScript, Node.js',
+  cgpa: '8.5',
+  bio: '',
+};
+
+const defaultCompanyForm = {
+  companyName: '',
+  email: '',
+  password: '',
+  industry: '',
+  website: '',
+  hiringFor: 'Frontend Developer, Backend Developer',
+  description: '',
+};
+
+const defaultInternshipForm = {
+  title: '',
+  description: '',
+  skillsRequired: 'React, Node.js',
+  stipend: '15000',
+  location: 'Remote',
+  type: 'Internship',
+  applyLink: '',
+};
+
+const defaultStudentLogin = {
+  email: '',
+  password: '',
+};
+
+const defaultCompanyLogin = {
+  email: '',
+  password: '',
+};
+
+const api = axios.create({
+  baseURL: '/api',
+});
+
+function App() {
+  const [studentForm, setStudentForm] = useState(defaultStudentForm);
+  const [companyForm, setCompanyForm] = useState(defaultCompanyForm);
+  const [internshipForm, setInternshipForm] = useState(defaultInternshipForm);
+  const [studentLogin, setStudentLogin] = useState(defaultStudentLogin);
+  const [companyLogin, setCompanyLogin] = useState(defaultCompanyLogin);
+  const [internships, setInternships] = useState([]);
+  const [student, setStudent] = useState(() => JSON.parse(localStorage.getItem('student') || 'null'));
+  const [company, setCompany] = useState(() => JSON.parse(localStorage.getItem('company') || 'null'));
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [message, setMessage] = useState('');
+
+  const loadInternships = async () => {
+    try {
+      const res = await api.get('/internships');
+      setInternships(res.data.internships || []);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Failed to load internships');
+    }
+  };
+
+  useEffect(() => {
+    loadInternships();
+  }, []);
+
+  const handleStudentSignup = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...studentForm,
+        skills: studentForm.skills.split(',').map((s) => s.trim()).filter(Boolean),
+        cgpa: Number(studentForm.cgpa),
+      };
+
+      const res = await api.post('/auth/student/signup', payload);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('student', JSON.stringify(res.data.user));
+      setToken(res.data.token);
+      setStudent(res.data.user);
+      setCompany(null);
+      localStorage.removeItem('company');
+      setMessage('Student account created successfully');
+      setStudentForm(defaultStudentForm);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Student signup failed');
+    }
+  };
+
+  const handleCompanySignup = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...companyForm,
+        hiringFor: companyForm.hiringFor.split(',').map((s) => s.trim()).filter(Boolean),
+      };
+
+      const res = await api.post('/auth/company/signup', payload);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('company', JSON.stringify(res.data.user));
+      setToken(res.data.token);
+      setCompany(res.data.user);
+      setStudent(null);
+      localStorage.removeItem('student');
+      setMessage('Company account created successfully');
+      setCompanyForm(defaultCompanyForm);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Company signup failed');
+    }
+  };
+
+  const handleStudentLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/auth/student/login', studentLogin);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('student', JSON.stringify(res.data.user));
+      setToken(res.data.token);
+      setStudent(res.data.user);
+      setCompany(null);
+      localStorage.removeItem('company');
+      setMessage('Student login successful');
+      setStudentLogin(defaultStudentLogin);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Student login failed');
+    }
+  };
+
+  const handleCompanyLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/auth/company/login', companyLogin);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('company', JSON.stringify(res.data.user));
+      setToken(res.data.token);
+      setCompany(res.data.user);
+      setStudent(null);
+      localStorage.removeItem('student');
+      setMessage('Company login successful');
+      setCompanyLogin(defaultCompanyLogin);
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Company login failed');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('student');
+    localStorage.removeItem('company');
+    setToken('');
+    setStudent(null);
+    setCompany(null);
+    setMessage('Logged out successfully');
+  };
+
+  const handleInternshipCreate = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...internshipForm,
+        skillsRequired: internshipForm.skillsRequired.split(',').map((s) => s.trim()).filter(Boolean),
+        stipend: Number(internshipForm.stipend),
+      };
+
+      await api.post('/internships', payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setMessage('Internship posted successfully');
+      setInternshipForm(defaultInternshipForm);
+      loadInternships();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Failed to post internship');
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div>
+          <h1>Internship Hub</h1>
+        </div>
+        <div className="header-actions">
+          {student && <span>Student: {student.name}</span>}
+          {company && <span>Company: {company.companyName}</span>}
+          {token && <button onClick={handleLogout}>Logout</button>}
+        </div>
+      </header>
+
+      {message && <div className="message-box">{message}</div>}
+
+      <main className="layout">
+        <section className="panel">
+          <h2>Student Signup</h2>
+          <form onSubmit={handleStudentSignup} className="form-grid">
+            <input value={studentForm.name} onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })} placeholder="Full name" />
+            <input value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} placeholder="Email" type="email" />
+            <input value={studentForm.password} onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })} placeholder="Password" type="password" />
+            <input value={studentForm.college} onChange={(e) => setStudentForm({ ...studentForm, college: e.target.value })} placeholder="College" />
+            <input value={studentForm.skills} onChange={(e) => setStudentForm({ ...studentForm, skills: e.target.value })} placeholder="Skills" />
+            <input value={studentForm.cgpa} onChange={(e) => setStudentForm({ ...studentForm, cgpa: e.target.value })} placeholder="CGPA" type="number" step="0.1" />
+            <textarea value={studentForm.bio} onChange={(e) => setStudentForm({ ...studentForm, bio: e.target.value })} placeholder="Short bio" rows="3" />
+            <button type="submit">Create Student Account</button>
+          </form>
+        </section>
+
+        <section className="panel">
+          <h2>Company Signup</h2>
+          <form onSubmit={handleCompanySignup} className="form-grid">
+            <input value={companyForm.companyName} onChange={(e) => setCompanyForm({ ...companyForm, companyName: e.target.value })} placeholder="Company name" />
+            <input value={companyForm.email} onChange={(e) => setCompanyForm({ ...companyForm, email: e.target.value })} placeholder="Email" type="email" />
+            <input value={companyForm.password} onChange={(e) => setCompanyForm({ ...companyForm, password: e.target.value })} placeholder="Password" type="password" />
+            <input value={companyForm.industry} onChange={(e) => setCompanyForm({ ...companyForm, industry: e.target.value })} placeholder="Industry" />
+            <input value={companyForm.website} onChange={(e) => setCompanyForm({ ...companyForm, website: e.target.value })} placeholder="Website" />
+            <input value={companyForm.hiringFor} onChange={(e) => setCompanyForm({ ...companyForm, hiringFor: e.target.value })} placeholder="Hiring roles" />
+            <textarea value={companyForm.description} onChange={(e) => setCompanyForm({ ...companyForm, description: e.target.value })} placeholder="Company description" rows="3" />
+            <button type="submit">Create Company Account</button>
+          </form>
+        </section>
+
+        <section className="panel">
+          <h2>Student Login</h2>
+          <form onSubmit={handleStudentLogin} className="form-grid">
+            <input value={studentLogin.email} onChange={(e) => setStudentLogin({ ...studentLogin, email: e.target.value })} placeholder="Student email" type="email" />
+            <input value={studentLogin.password} onChange={(e) => setStudentLogin({ ...studentLogin, password: e.target.value })} placeholder="Password" type="password" />
+            <button type="submit">Login as Student</button>
+          </form>
+        </section>
+
+        <section className="panel">
+          <h2>Company Login</h2>
+          <form onSubmit={handleCompanyLogin} className="form-grid">
+            <input value={companyLogin.email} onChange={(e) => setCompanyLogin({ ...companyLogin, email: e.target.value })} placeholder="Company email" type="email" />
+            <input value={companyLogin.password} onChange={(e) => setCompanyLogin({ ...companyLogin, password: e.target.value })} placeholder="Password" type="password" />
+            <button type="submit">Login as Company</button>
+          </form>
+        </section>
+
+        {company && (
+          <section className="panel">
+            <h2>Post New Internship</h2>
+            <form onSubmit={handleInternshipCreate} className="form-grid">
+              <input value={internshipForm.title} onChange={(e) => setInternshipForm({ ...internshipForm, title: e.target.value })} placeholder="Internship title" />
+              <input value={internshipForm.location} onChange={(e) => setInternshipForm({ ...internshipForm, location: e.target.value })} placeholder="Location" />
+              <input value={internshipForm.type} onChange={(e) => setInternshipForm({ ...internshipForm, type: e.target.value })} placeholder="Internship type" />
+              <input value={internshipForm.stipend} onChange={(e) => setInternshipForm({ ...internshipForm, stipend: e.target.value })} placeholder="Stipend" type="number" />
+              <input value={internshipForm.skillsRequired} onChange={(e) => setInternshipForm({ ...internshipForm, skillsRequired: e.target.value })} placeholder="Skills required" />
+              <input value={internshipForm.applyLink} onChange={(e) => setInternshipForm({ ...internshipForm, applyLink: e.target.value })} placeholder="Apply link" />
+              <textarea value={internshipForm.description} onChange={(e) => setInternshipForm({ ...internshipForm, description: e.target.value })} placeholder="Job description" rows="4" />
+              <button type="submit">Post Internship</button>
+            </form>
+          </section>
+        )}
+      </main>
+
+      <section className="list-section">
+        <div className="section-head">
+          <h2>Available Internships</h2>
+          <button onClick={loadInternships}>Refresh</button>
+        </div>
+
+        <div className="card-grid">
+          {internships.length === 0 ? (
+            <p>No internships posted yet.</p>
+          ) : (
+            internships.map((item) => (
+              <article key={item._id} className="job-card">
+                <span className="badge">{item.type}</span>
+                <h3>{item.title}</h3>
+                <p className="company-name">{item.companyId?.companyName || 'Company'}</p>
+                <p>{item.description}</p>
+                <ul>
+                  <li><strong>Skills:</strong> {item.skillsRequired?.join(', ') || 'Any'}</li>
+                  <li><strong>Location:</strong> {item.location}</li>
+                  <li><strong>Stipend:</strong> ₹{item.stipend || 0}</li>
+                </ul>
+                {item.applyLink ? (
+                  <a href={item.applyLink} target="_blank" rel="noreferrer">Apply now</a>
+                ) : (
+                  <button type="button">Apply</button>
+                )}
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default App;
